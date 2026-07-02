@@ -1,0 +1,25 @@
+services:
+    tusd:
+      image: tusproject/tusd:v2.10.0
+      command: > 
+        -verbose 
+        -s3-bucket horde 
+        -s3-endpoint https://49b824240b73d2b0614e6cf122559874.r2.cloudflarestorage.com 
+        -s3-object-prefix=public-uploads/ 
+        -port 8080 
+        -s3-min-part-size 52428800 
+        -s3-part-size 52428800
+        -disable-download
+      env_file: .env
+      volumes:
+        - tusd:/data
+      ports:
+        - "8080:8080"
+      networks:
+        - tusd
+
+volumes:
+  tusd:
+
+networks:
+  tusd:
