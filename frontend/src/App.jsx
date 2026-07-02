@@ -9,7 +9,7 @@ import './index.css';
 export function App() {
 	const [uppy] = useState(() =>
 		new Uppy().use(Tus, {
-			endpoint: 'http://localhost:8080/files/',
+			endpoint: 'https://tusd.bfportal.gg/files/',
 		}),
 	);
 
