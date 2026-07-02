@@ -6,7 +6,6 @@ services:
         -s3-bucket horde 
         -s3-endpoint https://49b824240b73d2b0614e6cf122559874.r2.cloudflarestorage.com 
         -s3-object-prefix=public-uploads/ 
-        -port 8080 
         -s3-min-part-size 52428800 
         -s3-part-size 52428800
         -disable-download
