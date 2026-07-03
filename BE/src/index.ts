@@ -145,21 +145,23 @@ async function signPart(request: Request, env: Env): Promise<Response> {
   }
 
   const client = s3Client(env);
-  const url = `${objectUrl(env, key)}?partNumber=${partNumber}&uploadId=${encodeURIComponent(uploadId)}`;
+  const url = new URL(
+    `${objectUrl(env, key)}?partNumber=${partNumber}&uploadId=${encodeURIComponent(uploadId)}`,
+  );
+  // Expiry MUST go in the query string, not a header: with signQuery, aws4fetch
+  // reads X-Amz-Expires from url.searchParams (falling back to a 24h default if
+  // absent) and never from headers. Setting it here keeps the 15-min expiry AND
+  // keeps `host` as the only signed header — a stray X-Amz-Expires *header* would
+  // otherwise be added to X-Amz-SignedHeaders, which the browser's PUT can't
+  // satisfy (→ SignatureDoesNotMatch).
+  url.searchParams.set("X-Amz-Expires", String(PART_URL_EXPIRY_SECONDS));
 
-  // We build the Request with NO Content-Type header, so aws4fetch signs only
-  // the `host` header (the sole signable header present). This is deliberate: if
-  // Content-Type were signed, the browser's own PUT Content-Type header would
-  // not match and would invalidate the signature.
+  // The Request carries NO Content-Type header, so aws4fetch signs only `host`.
+  // This is deliberate: if Content-Type were signed, the browser's own PUT
+  // Content-Type header would not match and would invalidate the signature.
   const signed = await client.sign(
-    new Request(url, { method: "PUT" }),
-    {
-      aws: {
-        signQuery: true, // presigned: SigV4 goes into the query string
-      },
-      // 15-minute expiry (X-Amz-Expires).
-      headers: { "X-Amz-Expires": String(PART_URL_EXPIRY_SECONDS) },
-    },
+    new Request(url.toString(), { method: "PUT" }),
+    { aws: { signQuery: true } }, // presigned: SigV4 goes into the query string
   );
 
   return json({ url: signed.url });
