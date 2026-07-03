@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@uppy/aws-s3": "^5",
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.1",
     "@uppy/react": "^5.2.0",
-    "@uppy/tus": "^5.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
