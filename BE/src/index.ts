@@ -28,7 +28,8 @@ interface Env {
   R2_SECRET_ACCESS_KEY: string;
 }
 
-const PART_URL_EXPIRY_SECONDS = 900; // 15 minutes
+const PART_URL_EXPIRY_SECONDS = 3600; // 1 hour — generous slack for slow links
+// & queued parts (Uppy signs each part lazily, so this bounds per-part start time)
 
 // CORS: in production the SPA and /api are same-origin (one Worker), so this is
 // mostly unnecessary. It exists for local dev (Vite :5173 → wrangler :8787).
@@ -150,7 +151,7 @@ async function signPart(request: Request, env: Env): Promise<Response> {
   );
   // Expiry MUST go in the query string, not a header: with signQuery, aws4fetch
   // reads X-Amz-Expires from url.searchParams (falling back to a 24h default if
-  // absent) and never from headers. Setting it here keeps the 15-min expiry AND
+  // absent) and never from headers. Setting it here keeps our chosen expiry AND
   // keeps `host` as the only signed header — a stray X-Amz-Expires *header* would
   // otherwise be added to X-Amz-SignedHeaders, which the browser's PUT can't
   // satisfy (→ SignatureDoesNotMatch).
