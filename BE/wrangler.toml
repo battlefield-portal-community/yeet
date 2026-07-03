@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# yeet — Cloudflare Worker that signs R2 multipart uploads (browser → R2 direct)
+# and serves the SPA static assets from ../FE/dist (single combined deployment).
+#
+# ── One-time setup ───────────────────────────────────────────────────────────
+#   1. Create the KV namespace and paste its id into [[kv_namespaces]] below:
+#        wrangler kv namespace create YEET
+#   2. Store the R2 S3-API credentials as SECRETS (never commit these):
+#        wrangler secret put R2_ACCESS_KEY_ID
+#        wrangler secret put R2_SECRET_ACCESS_KEY
+#
+# ── Toggle uploads on/off (the YEET KV "kill switch") ────────────────────────
+#   Enable:   wrangler kv key put --binding=YEET uploads:enabled true
+#   Disable:  wrangler kv key put --binding=YEET uploads:enabled false
+#   (When not exactly "true", all /api/uploads* endpoints return 403.)
+#
+# ── Deploy (order matters — build the FE first so ../FE/dist exists) ─────────
+#        cd ../FE && npm run build
+#        cd ../BE && wrangler deploy
+# ─────────────────────────────────────────────────────────────────────────────
+
+name = "yeet"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# Static assets: the built SPA. `env.ASSETS.fetch(request)` serves these, and
+# `single-page-application` rewrites unknown paths to index.html for client routing.
+[assets]
+directory = "../FE/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# General-purpose settings store. Keys are namespaced (e.g. "uploads:enabled").
+# Replace the placeholder id with the one printed by `wrangler kv namespace create YEET`.
+[[kv_namespaces]]
+binding = "YEET"
+id = "<run: wrangler kv namespace create YEET>"
+
+# Non-secret config. R2_ACCOUNT_ID is not sensitive; the S3 credentials are
+# stored as secrets (see setup above), NOT here.
+[vars]
+R2_ACCOUNT_ID = "49b824240b73d2b0614e6cf122559874"
+R2_BUCKET = "horde"
