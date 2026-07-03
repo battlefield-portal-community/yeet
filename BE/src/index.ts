@@ -133,19 +133,16 @@ async function createUpload(request: Request, env: Env): Promise<Response> {
   return json({ key, uploadId });
 }
 
-// ── /api/uploads/sign-part — presigned PUT URL for UploadPart ────────────────
-async function signPart(request: Request, env: Env): Promise<Response> {
-  const { key, uploadId, partNumber } = (await request.json()) as {
-    key?: unknown;
-    uploadId?: unknown;
-    partNumber?: unknown;
-  };
-
-  if (typeof key !== "string" || typeof uploadId !== "string" || typeof partNumber !== "number") {
-    return json({ error: "key, uploadId and partNumber are required" }, 400);
-  }
-
-  const client = s3Client(env);
+// Presign a single UploadPart PUT. Pure local crypto (aws4fetch computes the
+// SigV4 into the query string) — NO network call — so signing many parts in one
+// request is cheap. This is the shared core of both sign endpoints below.
+async function presignPart(
+  client: AwsClient,
+  env: Env,
+  key: string,
+  uploadId: string,
+  partNumber: number,
+): Promise<string> {
   const url = new URL(
     `${objectUrl(env, key)}?partNumber=${partNumber}&uploadId=${encodeURIComponent(uploadId)}`,
   );
@@ -164,8 +161,67 @@ async function signPart(request: Request, env: Env): Promise<Response> {
     new Request(url.toString(), { method: "PUT" }),
     { aws: { signQuery: true } }, // presigned: SigV4 goes into the query string
   );
+  return signed.url;
+}
 
-  return json({ url: signed.url });
+// ── /api/uploads/sign-part — presigned PUT URL for a single UploadPart ───────
+// Kept for compatibility / single-part paths; batch clients use /sign-parts.
+async function signPart(request: Request, env: Env): Promise<Response> {
+  const { key, uploadId, partNumber } = (await request.json()) as {
+    key?: unknown;
+    uploadId?: unknown;
+    partNumber?: unknown;
+  };
+
+  if (typeof key !== "string" || typeof uploadId !== "string" || typeof partNumber !== "number") {
+    return json({ error: "key, uploadId and partNumber are required" }, 400);
+  }
+
+  const url = await presignPart(s3Client(env), env, key, uploadId, partNumber);
+  return json({ url });
+}
+
+// ── /api/uploads/sign-parts — batch presign to cut inbound request volume ────
+// Uppy signs each part lazily, one POST per part. For a large file that is
+// hundreds of near-identical POSTs to one path in seconds, which trips
+// Cloudflare rate limiting. Since presigning is local (no subrequest), we sign
+// a whole window of parts in ONE request; the client caches the results.
+// Defensive cap on how many parts a SINGLE /sign-parts request may ask for — a
+// request-size guard, NOT the per-upload part limit (that is 10,000 parts per
+// uploadId, scoped to one multipart upload and independent across concurrent
+// uploads). The client's SIGN_BATCH_SIZE (100) stays well under this.
+const MAX_PARTS_PER_BATCH = 1000;
+
+async function signParts(request: Request, env: Env): Promise<Response> {
+  const { key, uploadId, partNumbers } = (await request.json()) as {
+    key?: unknown;
+    uploadId?: unknown;
+    partNumbers?: unknown;
+  };
+
+  if (
+    typeof key !== "string" ||
+    typeof uploadId !== "string" ||
+    !Array.isArray(partNumbers) ||
+    partNumbers.length === 0 ||
+    partNumbers.length > MAX_PARTS_PER_BATCH ||
+    !partNumbers.every((n) => Number.isInteger(n) && (n as number) >= 1)
+  ) {
+    return json(
+      { error: `key, uploadId and partNumbers[] (1..${MAX_PARTS_PER_BATCH}, each ≥ 1) are required` },
+      400,
+    );
+  }
+
+  const client = s3Client(env);
+  const entries = await Promise.all(
+    (partNumbers as number[]).map(
+      async (n) => [n, await presignPart(client, env, key, uploadId, n)] as const,
+    ),
+  );
+
+  // { [partNumber]: url } — the client keys its cache by part number.
+  return json({ urls: Object.fromEntries(entries) });
 }
 
 // ── /api/uploads/complete — CompleteMultipartUpload ──────────────────────────
@@ -293,6 +349,8 @@ async function handleApi(request: Request, env: Env, pathname: string): Promise<
       return createUpload(request, env);
     case "/api/uploads/sign-part":
       return signPart(request, env);
+    case "/api/uploads/sign-parts":
+      return signParts(request, env);
     case "/api/uploads/complete":
       return completeUpload(request, env);
     case "/api/uploads/abort":

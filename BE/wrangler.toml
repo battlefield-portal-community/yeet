@@ -34,7 +34,7 @@ not_found_handling = "single-page-application"
 # Replace the placeholder id with the one printed by `wrangler kv namespace create YEET`.
 [[kv_namespaces]]
 binding = "YEET"
-id = "<run: wrangler kv namespace create YEET>"
+id = "48ddded7b01a4f0baca8895b9c3c1d2d"
 
 # Non-secret config. R2_ACCOUNT_ID is not sensitive; the S3 credentials are
 # stored as secrets (see setup above), NOT here.
