@@ -162,6 +162,24 @@ handler routes `/api/*` to the upload logic and everything else to
 `ASSETS.fetch` (with SPA fallback to `index.html`). One deployment, one origin,
 both the frontend and the API.
 
+### Automatic deploys on push (Workers Builds)
+
+To deploy on every push, connect the repo to the existing `yeet` Worker via
+[Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/):
+dashboard → **Workers & Pages → yeet → Settings → Build → Connect**. Then set:
+
+| Field | Value |
+| --- | --- |
+| Root directory | `BE` |
+| Build command | `npm ci && cd ../FE && npm ci && npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Production branch | `main` |
+
+The build command builds the FE explicitly because Workers Builds only
+auto-installs deps for the root directory (`BE`), then deploy runs from `BE`
+where `wrangler.toml` finds `../FE/dist`. Runtime secrets, KV, and `[vars]` are
+already on the Worker / in `wrangler.toml` — nothing else to add to CI.
+
 ## Endpoints
 
 All endpoints are `POST`, take/return JSON, and are gated by the `uploads:enabled`
