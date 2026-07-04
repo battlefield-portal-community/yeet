@@ -26,6 +26,7 @@ interface Env {
   R2_BUCKET: string;
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;
+  PUBLIC_BASE: string;
 }
 
 const PART_URL_EXPIRY_SECONDS = 3600; // 1 hour — generous slack for slow links
@@ -68,6 +69,15 @@ function s3Client(env: Env): AwsClient {
 function objectUrl(env: Env, key: string): string {
   const encodedKey = key.split("/").map(encodeURIComponent).join("/");
   return `${endpoint(env)}/${env.R2_BUCKET}/${encodedKey}`;
+}
+
+// Public, browser-fetchable URL for a key, via the bucket's custom domain.
+// The custom domain is bound to the bucket root, so the key alone is the path —
+// NO `${R2_BUCKET}` segment (that prefix only exists on the S3 endpoint in
+// objectUrl). Result: https://hoard.bfportal.gg/public-uploads/<uuid>/<name>.
+function publicUrl(env: Env, key: string): string {
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  return `${env.PUBLIC_BASE}/${encodedKey}`;
 }
 
 // Sanitize a user-supplied filename: strip path separators, "..", control
@@ -265,7 +275,7 @@ async function completeUpload(request: Request, env: Env): Promise<Response> {
     return json({ error: "Failed to complete upload", detail: await res.text() }, 502);
   }
 
-  return json({ location: objectUrl(env, key), key });
+  return json({ location: publicUrl(env, key), key });
 }
 
 // ── /api/uploads/abort — AbortMultipartUpload ────────────────────────────────

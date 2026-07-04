@@ -46,3 +46,8 @@ id = "48ddded7b01a4f0baca8895b9c3c1d2d"
 [vars]
 R2_ACCOUNT_ID = "49b824240b73d2b0614e6cf122559874"
 R2_BUCKET = "horde"
+# Public base URL for completed objects — the bucket's custom domain. Returned
+# as `location` from /complete so the browser gets a publicly-fetchable link
+# (the r2.cloudflarestorage.com S3 endpoint requires SigV4 and is NOT public).
+# No trailing slash.
+PUBLIC_BASE = "https://hoard.bfportal.gg"
