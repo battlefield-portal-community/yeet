@@ -98,6 +98,7 @@ export function App() {
 				height={550}
 				showProgressDetails={true}
 				singleFileFullScreen={false}
+				showLinkToFileUploadResult={true}
 			/>
 		</main>
 	);
